@@ -38,15 +38,25 @@ properties
     Nyx = [];
     Nxy = [];
     
+    % container for array of magnetic susceptibility tensor
+    suscept = containers.Map('KeyType','double','ValueType','any');
+    
     % FMR frequency
     freq = [];
-    % external magentic field
-    H = 500;
+    
+    % external magentic field (Oe)
+    H = 530;
+    
+    % damping constant
+    alpha = 0.001
     
     % conversion factor for magnetization (A/m -> G)
     convM = 4*pi/1e3;
     % conversion factor for magnetic field (T -> G)
-    convH = 1e4; 
+    convH = 1e4;
+    
+    % giromagnetic ratio
+    gamma = 1.76e7;
 end
 
 properties (Access = private)
@@ -91,6 +101,8 @@ methods
     function obj = freqCalc()
     end
     
+    % calculate in-plane and out-of-plane deflections of magnetisation,
+    % save deflected states
     function calcDeflection(obj)
         obj.readFile(obj.staticFile);
         disp('Calculate fields');
@@ -120,6 +132,8 @@ methods
         obj.checkDeflection();
     end 
     
+    % calculate components of demagnetizing tensor using in-plane and
+    % out-of-plane components of magnetizationf and magnetic field
     function calcDemagTensor(obj,varargin)
         
         p = inputParser;
@@ -218,7 +232,11 @@ methods
         % calculate demagnetizing factors
 
         obj.Nyy = -hOutLoc(:,:,:,3)./mOutLoc(:,:,:,3);
+        obj.Nyx = -hOutLoc(:,:,:,2)./mOutLoc(:,:,:,3);
+        
         obj.Nxx = -hInpLoc(:,:,:,2)./mInpLoc(:,:,:,2);
+        obj.Nxy = -hInpLoc(:,:,:,3)./mInpLoc(:,:,:,2);
+
         obj.calcFreq();
         obj.show();
                 
@@ -241,13 +259,14 @@ methods
         
     end
     
+    % calculate frequency of quasi-uniform mode using demagnetizing tensor 
     function calcFreq(obj)
-        gamma = 1.76e7/(2*pi);
-        obj.freq = gamma*sqrt(abs((obj.H+obj.Ms.*(obj.Nxx-obj.Nzz)).*...
-            (obj.H+obj.Ms.*(obj.Nyy-obj.Nzz))));
+        obj.freq = obj.gamma*sqrt(abs((obj.H+obj.Ms.*(obj.Nxx-obj.Nzz)).*...
+            (obj.H+obj.Ms.*(obj.Nyy-obj.Nzz))))/(2*pi);
         
     end    
     
+    % show results of calculation of demag tensor and frequency
     function show(obj,varargin)   
         % parse input parameters
         p = inputParser;
@@ -263,33 +282,36 @@ methods
             disp('Warning: parameter "zSlice" exceeds array size. It was set to 1.')
         end    
         
+        % calculate scales
+        xScale = linspace(obj.xmin,obj.xmax,obj.xnodes)*1e6;
+        yScale = linspace(obj.ymin,obj.ymax,obj.ynodes)*1e6;
+
+        
         f1=figure(1);
-        clf();
-        set(gcf,'name','Nxx','numbertitle','off') 
-        imagesc(squeeze(obj.Nxx(:,:,params.zSlice)).'); title('Nxx'); colorbar();
+            clf(); set(gcf,'name','Nxx','numbertitle','off') 
+            imagesc(xScale,yScale,squeeze(obj.Nxx(:,:,params.zSlice)).');
+            title('Nxx'); colorbar();
 
         f2 = figure(2);
-        clf();
-        set(gcf,'name','Nyy','numbertitle','off') 
-        imagesc(squeeze(obj.Nyy(:,:,params.zSlice)).'); title('Nyy'); colorbar();
-        
+            clf(); set(gcf,'name','Nyy','numbertitle','off') 
+            imagesc(xScale,yScale,squeeze(obj.Nyy(:,:,params.zSlice)).');
+            title('Nyy'); colorbar();
+
         f3 = figure(3);
-        clf();
-        set(gcf,'name','Nzz','numbertitle','off') 
-        imagesc(squeeze(obj.Nzz(:,:,params.zSlice)).'); title('Nzz'); colorbar();
-        
+            clf(); set(gcf,'name','Nzz','numbertitle','off') 
+            imagesc(xScale,yScale,squeeze(obj.Nzz(:,:,params.zSlice)).');
+            title('Nzz'); colorbar();
+
         f4 = figure(4);
-        clf();
-        set(gcf,'name','Frequency','numbertitle','off'); 
-        imagesc(linspace(obj.xmin,obj.xmax,obj.xnodes),...
-                linspace(obj.ymin,obj.ymax,obj.ynodes),...
-                squeeze(obj.freq(:,:,params.zSlice)).'/1e9); title('Frequency'); colorbar();
+            clf(); set(gcf,'name','Frequency','numbertitle','off');
+            imagesc(xScale,yScale,squeeze(obj.freq(:,:,params.zSlice)).'/1e9);
+            title('Frequency'); colorbar();
         
         yScale = linspace(0,5,obj.ynodes);
         f5 = figure(5);
         clf();
         set(gcf,'name','Frequency slice','numbertitle','off'); 
-        plot(yScale,squeeze(obj.freq(2000,:,8))/1e9); title('Frequency');
+        plot(yScale,squeeze(obj.freq(1000,:,1))/1e9); title('Frequency');
         ylabel('Frequency (GHz)');
         xlabel('x (\mum)');
         
@@ -309,7 +331,7 @@ methods
         end    
     end   
     
-    % plot result of deflection 
+    % plot result of deflection (test method)
     function checkDeflection(obj)
         slice = 1;
         % load static magnetization
@@ -464,6 +486,102 @@ methods
             colorbar(); title('M_{out}^z');     
         
     end
+    
+    % calculate spatial distribution of magnetic susceptibility for the
+    % given frequency
+    % parameters:
+    %     - freq - frequency (GHz)
+    function calcSuscept(obj,varargin)      
+        % parse input parameters
+        p = inputParser();
+        p.addParamValue('freq',10,@isnumeric);
+        p.addParamValue('showResults',true,@islogical);
+        p.parse(varargin{:});
+        params = p.Results;
+        
+        w = 2*pi*params.freq*1e9;
+        
+        wH = obj.gamma*(obj.H-obj.Nzz.*obj.Ms);
+        w1 = wH +0.5*obj.gamma*obj.Ms.*(obj.Nxx+obj.Nyy+obj.Nyx+obj.Nxy);
+        w0 = sqrt((obj.H+obj.Ms.*(obj.Nxx-obj.Nzz)).*(obj.H+obj.Ms.*(obj.Nyy-obj.Nzz))...
+         -obj.Nxy.*obj.Nyx.*obj.Ms.^2).*obj.gamma;
+     
+        % (w0^2-w^2) denominator
+        freqDiff = w0.^2-w.^2;
+                
+        chiXX = ((obj.gamma*obj.Ms.*freqDiff.*(wH+obj.gamma*obj.Ms.*obj.Nyy))...
+            -j*(-obj.alpha*w*obj.gamma*obj.Ms.*freqDiff+...
+            2*obj.alpha*obj.gamma*w*w1.*obj.Ms.*(wH+obj.gamma*obj.Ms.*obj.Nyy)))./freqDiff.^2;
+        
+        chiYY = ((obj.gamma*obj.Ms.*freqDiff.*(wH+obj.gamma*obj.Ms.*obj.Nxx))...
+            -j*(-obj.alpha*w*obj.gamma*obj.Ms.*freqDiff+...
+            2*obj.alpha*obj.gamma*w*w1.*obj.Ms.*(wH+obj.gamma*obj.Ms.*obj.Nxx)))./freqDiff.^2;
+        
+        chiXY = (-(obj.gamma*obj.Ms).^2.*freqDiff.*obj.Nxy+2*obj.gamma*obj.Ms.*w1.*w^2*obj.alpha-...
+                    j*(-w*obj.gamma*obj.Ms.*freqDiff-8*pi*(obj.gamma*obj.Ms).^2.*w1.*obj.Nxy.*w*obj.alpha))./freqDiff.^2;     
+       
+        chiYX = (-(obj.gamma*obj.Ms).^2.*freqDiff.*obj.Nyx-2*obj.gamma*obj.Ms.*w1.*w^2*obj.alpha-...
+                    j*(w*obj.gamma*obj.Ms.*freqDiff-8*pi*(obj.gamma*obj.Ms).^2.*w1.*obj.Nyx.*w*obj.alpha))./freqDiff.^2;     
+        
+        obj.suscept(params.freq) = struct('xx',chiXX,'xy',chiXY,'yx',chiYX,'yy',chiYY);
+        
+        if params.showResults
+            % calculate scales
+            xScale = linspace(obj.xmin,obj.xmax,obj.xnodes)*1e6;
+            yScale = linspace(obj.ymin,obj.ymax,obj.ynodes)*1e6;
+            
+            figure(1);
+                clf(); set(gcf,'name','chi_x_x','numbertitle','off')
+                subplot(211);
+                    imagesc(xScale,yScale,log10(abs(real(squeeze(obj.chiXX(:,:,1))))).');
+                    colorbar()
+                subplot(212);
+                    imagesc(xScale,yScale,log10(abs(imag(squeeze(obj.chiXX(:,:,1))))).')
+                    colorbar();
+
+            figure(2);
+                clf(); set(gcf,'name','chi_y_y','numbertitle','off')
+                subplot(211);
+                    imagesc(xScale,yScale,real(squeeze(obj.chiYY(:,:,1))).');
+                    colorbar()
+                subplot(212);
+                    imagesc(xScale,yScale,imag(squeeze(obj.chiYY(:,:,1))).')
+                    colorbar();
+
+            figure(3);
+                clf(); set(gcf,'name','chi_x_y','numbertitle','off')
+                subplot(211);
+                    imagesc(xScale,yScale,real(squeeze(obj.chiXY(:,:,1))).');
+                    colorbar()
+                subplot(212);
+                    imagesc(xScale,yScale,imag(squeeze(obj.chiXY(:,:,1))).')
+                    colorbar();    
+
+            figure(4);
+                clf(); set(gcf,'name','chi_y_x','numbertitle','off')
+                subplot(211);
+                    imagesc(xScale,yScale,real(squeeze(obj.chiYX(:,:,1))).');
+                    colorbar()
+                subplot(212);
+                    imagesc(xScale,yScale,imag(squeeze(obj.chiYX(:,:,1))).')
+                    colorbar();
+
+            figure(5);
+                hist(sqrt(abs(freqDiff(:))),20); title('w^2-w0^2');
+
+            figure(6);
+                hist(w0(:),20); title('w0');
+        end         
+    end
+    
+    % calculate set of spatial maps of magnetic susceptibility for the
+    % given range of frequency
+    function getSuscept(obj,freqList)
+       for freq = freqList
+           obj.calcSuscept('freq',freq);
+       end    
+    end    
+    
 end
 
 methods (Access = private)
@@ -602,7 +720,7 @@ methods (Access = private)
         end
     end
     
-    % return rotation matrix for one point
+    % return rotation matrix for one spatial point of the mesh
     function rot = getRotation(obj,Mx,My,Mz)
         Ms = sqrt(Mx^2+My^2+Mz^2);
         sq = sqrt(Mx^2+My^2);
