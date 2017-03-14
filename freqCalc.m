@@ -22,10 +22,9 @@ properties
     dim = 3;
     
     % ground magnetization
-    Mx0;
-    My0;
-    Mz0;
-    Ms;
+    M0;
+    % saturation magnetization
+    Ms
     
     % dynamic fields in local coordinate system
     hInpLoc = [];
@@ -106,22 +105,24 @@ methods
     function calcDeflection(obj)
         obj.readFile(obj.staticFile);
         disp('Calculate fields');
-        M0 = obj.readFile(obj.staticFile);
-        Ms = sqrt(M0(:,:,:,1).^2+M0(:,:,:,2).^2+M0(:,:,:,3).^2);
+        obj.M0 = obj.readFile(obj.staticFile);
+        obj.Ms = sqrt(obj.M0(:,:,:,1).^2+obj.M0(:,:,:,2).^2+obj.M0(:,:,:,3).^2);
         
         % calculate direction of in-plane deflection
-        norm = Ms./sqrt(M0(:,:,:,1).^2+M0(:,:,:,2).^2);
-        nInp(:,:,:,1) = -norm.*M0(:,:,:,2);
-        nInp(:,:,:,2) = norm.*M0(:,:,:,1);
+        norm = obj.Ms./sqrt(obj.M0(:,:,:,1).^2+obj.M0(:,:,:,2).^2);
+        nInp(:,:,:,1) = -norm.*obj.M0(:,:,:,2);
+        nInp(:,:,:,2) = norm.*obj.M0(:,:,:,1);
         nInp(:,:,:,3) = zeros(obj.xnodes,obj.ynodes,obj.znodes);
-        Minp = M0 + obj.def*nInp;
+        Minp = obj.M0 + obj.def*nInp;
+        Minp(find(isnan(Minp)==true)) = 0;
         
         % calculate direction of out-plane deflection
-        norm = sqrt(M0(:,:,:,1).^2+M0(:,:,:,2).^2); 
-        nOut(:,:,:,1) = (-M0(:,:,:,1).*M0(:,:,:,3))./norm;
-        nOut(:,:,:,2) = (-M0(:,:,:,2).*M0(:,:,:,3))./norm;
+        norm = sqrt(obj.M0(:,:,:,1).^2+obj.M0(:,:,:,2).^2); 
+        nOut(:,:,:,1) = (-obj.M0(:,:,:,1).*obj.M0(:,:,:,3))./norm;
+        nOut(:,:,:,2) = (-obj.M0(:,:,:,2).*obj.M0(:,:,:,3))./norm;
         nOut(:,:,:,3) = norm;
-        Mout = M0 + obj.def*nOut;      
+        Mout = obj.M0 + obj.def*nOut;
+        Mout(find(isnan(Mout)==true)) = 0;
         
         disp('Write in-plane file');
         obj.writeData(obj.inpFile,Minp);
@@ -129,7 +130,7 @@ methods
         disp('Write out-of-plane file');
         obj.writeData(obj.outFile,Mout);
         
-        obj.checkDeflection();
+        %obj.checkDeflection();
     end 
     
     % calculate components of demagnetizing tensor using in-plane and
@@ -142,11 +143,10 @@ methods
         params = p.Results;
         
         % load static magnetization
-        M0 = obj.convM*obj.readFile(obj.staticFile);
-        Sz = size(M0);
+        obj.M0 = obj.convM*obj.readFile(obj.staticFile);
+        Sz = size(obj.M0);
         L = Sz(1)*Sz(2)*Sz(3);
-        Ms = sqrt(M0(:,:,:,1).^2+M0(:,:,:,2).^2+M0(:,:,:,3).^2);
-        obj.Ms = Ms;
+        obj.Ms = sqrt(obj.M0(:,:,:,1).^2+obj.M0(:,:,:,2).^2+obj.M0(:,:,:,3).^2);
         
         % load dynamic magnetization
         Minp = obj.convM*obj.readFile(obj.inpFile);
@@ -174,8 +174,8 @@ methods
                 HdOut = obj.convH*obj.readFile(obj.BdemagOutFile);
                 
                 % calculate Nzz
-                obj.Nzz = -(Hd0(:,:,:,1).*M0(:,:,:,1)+Hd0(:,:,:,2).*M0(:,:,:,2)...
-                    +Hd0(:,:,:,3).*M0(:,:,:,3))./(Ms.^2);
+                obj.Nzz = -(Hd0(:,:,:,1).*obj.M0(:,:,:,1)+Hd0(:,:,:,2).*obj.M0(:,:,:,2)...
+                    +Hd0(:,:,:,3).*obj.M0(:,:,:,3))./(obj.Ms.^2);
                 
                 % calculate dynamic fields
                 hInp = reshape(HdInp - Hd0,[L 3]);
@@ -203,10 +203,10 @@ methods
         end        
 
         
-        mInp = reshape(Minp-M0,[L 3]);
-        mOut = reshape(Mout-M0,[L 3]);
-        M0   = reshape(M0,[L 3]);
-        Ms   = reshape(Ms,[L 1]);
+        mInp = reshape(Minp-obj.M0,[L 3]);
+        mOut = reshape(Mout-obj.M0,[L 3]);
+        M0   = reshape(obj.M0,[L 3]);
+        Ms   = reshape(obj.Ms,[L 1]);
         
         parfor ind = 1:size(hInp,1)
             rot = obj.getRotation(M0(ind,1),M0(ind,2),M0(ind,3));
@@ -361,39 +361,39 @@ methods
         clf();
         set(gcf,'name','M0','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(M0(:,slice,:,1)).');
+            imagesc(squeeze(M0(:,:,slice,1)).');
             colorbar(); title('M_0^x');
         subplot(312)
-            imagesc(squeeze(M0(:,slice,:,2)).');
+            imagesc(squeeze(M0(:,:,slice,2)).');
             colorbar(); title('M_0^y')
         subplot(313)
-            imagesc(squeeze(M0(:,slice,:,3)).');
+            imagesc(squeeze(M0(:,:,slice,3)).');
             colorbar(); title('M_0^z');
             
         figure(7);
         clf();
         set(gcf,'name','Minp','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(Minp(:,slice,:,1)).');
+            imagesc(squeeze(Minp(:,:,slice,1)).');
             colorbar(); title('M_inp^x');
         subplot(312)
-            imagesc(squeeze(Minp(:,slice,:,2)).');
+            imagesc(squeeze(Minp(:,:,slice,2)).');
             colorbar(); title('M_inp^y')
         subplot(313)
-            imagesc(squeeze(Minp(:,slice,:,3)).');
+            imagesc(squeeze(Minp(:,:,slice,3)).');
             colorbar(); title('M_inp^z');
             
         figure(8);
         clf();
         set(gcf,'name','Mout','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(Mout(:,slice,:,1)).');
+            imagesc(squeeze(Mout(:,:,slice,1)).');
             colorbar(); title('M_out^x');
         subplot(312)
-            imagesc(squeeze(Mout(:,slice,:,2)).');
+            imagesc(squeeze(Mout(:,:,slice,2)).');
             colorbar(); title('M_out^y')
         subplot(313)
-            imagesc(squeeze(Mout(:,slice,:,3)).');
+            imagesc(squeeze(Mout(:,:,slice,3)).');
             colorbar(); title('M_out^z');    
         
         M0   = reshape(M0,[L 3]);
@@ -423,13 +423,13 @@ methods
         clf();
         set(gcf,'name','M0 local','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(M0Loc(:,slice,:,1)).');
+            imagesc(squeeze(M0Loc(:,:,slice,1)).');
             colorbar(); title('M_0^z');
         subplot(312)
-            imagesc(squeeze(M0Loc(:,slice,:,2)).');
+            imagesc(squeeze(M0Loc(:,:,slice,2)).');
             colorbar(); title('M_0^x')
         subplot(313)
-            imagesc(squeeze(M0Loc(:,slice,:,3)).');
+            imagesc(squeeze(M0Loc(:,:,slice,3)).');
             colorbar(); title('M_0^y')
         
             
@@ -437,52 +437,52 @@ methods
         clf();
         set(gcf,'name','Minp Loc','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(MinpLoc(:,slice,:,1)).');
+            imagesc(squeeze(MinpLoc(:,:,slice,1)).');
             colorbar(); title('M_{inp}^z');
         subplot(312)
-            imagesc(squeeze(MinpLoc(:,slice,:,2)).');
+            imagesc(squeeze(MinpLoc(:,:,slice,2)).');
             colorbar(); title('M_{inp}^x');
         subplot(313)
-            imagesc(squeeze(MinpLoc(:,slice,:,3)).');
+            imagesc(squeeze(MinpLoc(:,:,slice,3)).');
             colorbar(); title('M_{inp}^y');
             
         figure(3);
         clf();
         set(gcf,'name','Mout Loc','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(MoutLoc(:,slice,:,1)).');
+            imagesc(squeeze(MoutLoc(:,:,slice,1)).');
             colorbar(); title('M_{out}^z');
         subplot(312)
-            imagesc(squeeze(MoutLoc(:,slice,:,2)).');
+            imagesc(squeeze(MoutLoc(:,:,slice,2)).');
             colorbar(); title('M_{out}^x');
         subplot(313)
-            imagesc(squeeze(MoutLoc(:,slice,:,3)).');
+            imagesc(squeeze(MoutLoc(:,:,slice,3)).');
             colorbar(); title('M_{out}^y');
             
         figure(4);
         clf();
         set(gcf,'name','mInp Loc','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(mInp(:,slice,:,1)).');
+            imagesc(squeeze(mInp(:,:,slice,1)).');
             colorbar(); title('M_{out}^x');
         subplot(312)
-            imagesc(squeeze(mInp(:,slice,:,2)).');
+            imagesc(squeeze(mInp(:,:,slice,2)).');
             colorbar(); title('M_{out}^y');
         subplot(313)
-            imagesc(squeeze(mInp(:,slice,:,3)).');
+            imagesc(squeeze(mInp(:,:,slice,3)).');
             colorbar(); title('M_{out}^z');
        
        figure(5);
         clf();
         set(gcf,'name','mOut Loc','numbertitle','off') 
         subplot(311)
-            imagesc(squeeze(mOut(:,slice,:,1)).');
+            imagesc(squeeze(mOut(:,:,slice,1)).');
             colorbar(); title('M_{out}^x');
         subplot(312)
-            imagesc(squeeze(mOut(:,slice,:,2)).');
+            imagesc(squeeze(mOut(:,:,slice,2)).');
             colorbar(); title('M_{out}^y');
         subplot(313)
-            imagesc(squeeze(mOut(:,slice,:,3)).');
+            imagesc(squeeze(mOut(:,:,slice,3)).');
             colorbar(); title('M_{out}^z');     
         
     end
@@ -499,11 +499,19 @@ methods
         p.parse(varargin{:});
         params = p.Results;
         
+        
+        % create matrix of magnetic field
+        H = zeros(obj.xnodes,obj.ynodes,obj.znodes,3);
+        H(:,:,:,2) = obj.H;
+        
+        % calculate projection of field
+        Hz = (H(:,:,:,1).*obj.M0(:,:,:,1)+H(:,:,:,2).*obj.M0(:,:,:,2)+H(:,:,:,3).*obj.M0(:,:,:,3))./obj.Ms;
+        
         w = 2*pi*params.freq*1e9;
         
-        wH = obj.gamma*(obj.H-obj.Nzz.*obj.Ms);
-        w1 = wH +0.5*obj.gamma*obj.Ms.*(obj.Nxx+obj.Nyy+obj.Nyx+obj.Nxy);
-        w0 = sqrt((obj.H+obj.Ms.*(obj.Nxx-obj.Nzz)).*(obj.H+obj.Ms.*(obj.Nyy-obj.Nzz))...
+        wH = obj.gamma*(Hz-obj.Nzz.*obj.Ms);
+        w1 = wH +0.5*obj.gamma*obj.Ms.*(obj.Nxx+obj.Nyy+obj.Nyx-obj.Nxy);
+        w0 = sqrt((Hz+obj.Ms.*(obj.Nxx-obj.Nzz)).*(obj.H+obj.Ms.*(obj.Nyy-obj.Nzz))...
          -obj.Nxy.*obj.Nyx.*obj.Ms.^2).*obj.gamma;
      
         % (w0^2-w^2) denominator
@@ -533,37 +541,37 @@ methods
             figure(1);
                 clf(); set(gcf,'name','chi_x_x','numbertitle','off')
                 subplot(211);
-                    imagesc(xScale,yScale,log10(abs(real(squeeze(obj.chiXX(:,:,1))))).');
+                    imagesc(xScale,yScale,log10(abs(real(squeeze(chiXX(:,:,1))))).');
                     colorbar()
                 subplot(212);
-                    imagesc(xScale,yScale,log10(abs(imag(squeeze(obj.chiXX(:,:,1))))).')
+                    imagesc(xScale,yScale,log10(abs(imag(squeeze(chiXX(:,:,1))))).')
                     colorbar();
 
             figure(2);
                 clf(); set(gcf,'name','chi_y_y','numbertitle','off')
                 subplot(211);
-                    imagesc(xScale,yScale,real(squeeze(obj.chiYY(:,:,1))).');
+                    imagesc(xScale,yScale,real(squeeze(chiYY(:,:,1))).');
                     colorbar()
                 subplot(212);
-                    imagesc(xScale,yScale,imag(squeeze(obj.chiYY(:,:,1))).')
+                    imagesc(xScale,yScale,imag(squeeze(chiYY(:,:,1))).')
                     colorbar();
 
             figure(3);
                 clf(); set(gcf,'name','chi_x_y','numbertitle','off')
                 subplot(211);
-                    imagesc(xScale,yScale,real(squeeze(obj.chiXY(:,:,1))).');
+                    imagesc(xScale,yScale,real(squeeze(chiXY(:,:,1))).');
                     colorbar()
                 subplot(212);
-                    imagesc(xScale,yScale,imag(squeeze(obj.chiXY(:,:,1))).')
+                    imagesc(xScale,yScale,imag(squeeze(chiXY(:,:,1))).')
                     colorbar();    
 
             figure(4);
                 clf(); set(gcf,'name','chi_y_x','numbertitle','off')
                 subplot(211);
-                    imagesc(xScale,yScale,real(squeeze(obj.chiYX(:,:,1))).');
+                    imagesc(xScale,yScale,real(squeeze(chiYX(:,:,1))).');
                     colorbar()
                 subplot(212);
-                    imagesc(xScale,yScale,imag(squeeze(obj.chiYX(:,:,1))).')
+                    imagesc(xScale,yScale,imag(squeeze(chiYX(:,:,1))).')
                     colorbar();
 
             figure(5);
@@ -578,9 +586,31 @@ methods
     % given range of frequency
     function getSuscept(obj,freqList)
        for freq = freqList
-           obj.calcSuscept('freq',freq);
-       end    
-    end    
+           obj.calcSuscept('freq',freq,'showResults',true);
+       end
+       
+       
+       x = 2048; y = 64; z = 4;
+       
+       xxArr = [];
+       xyArr = [];
+       for freq = freqList
+           xxArr = [xxArr, obj.suscept(freq).xx(x,y,z)];
+           xyArr = [xyArr, obj.suscept(freq).xy(x,y,z)];
+           
+       end
+       
+       figure(10);
+           clf(); title('Chi x x');
+           plot(freqList,real(xxArr),freqList,imag(xxArr));
+           xlabel('Frequency (GHz)');
+       
+       figure(11);
+           clf();  title('Chi x y');
+           plot(freqList,real(xyArr),freqList,imag(xyArr));
+           xlabel('Frequency (GHz)');
+       
+    end
     
 end
 
