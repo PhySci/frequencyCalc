@@ -42,7 +42,8 @@ First four lines load the ground state "static.stc" and save demagnetization, ex
 8. Run the simulation. It takes a few minutes. As a results you will have a plenty of files of magnetic fields.
 
 9. Go to MatLab. Set correct value of bias magnetic field (for instance, H = 500 Oe).
-      FC.H = 500;
+     
+     FC.H = 500;
 
 10. Run calculatation of demagnetization tensor and spatial map of FMR frequency:
 
