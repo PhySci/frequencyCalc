@@ -8,9 +8,12 @@ The MatLab class "freqCalc" provides functionality for calculation of local FMR 
 4. Run MatLab, go to a folder with the ground state file "static.stc".
 5. Create instance of freqCalc class (here and below I'm using name "FC" for the instance)
 
+
     FC = freqCalc;
 	
 6. Calculate deflected states of static magnetisation
+
+
     FC.calcDeflection();
  	
 7. Now you have to calculate magnetic fields for the given states using a micromagnetic package. If you use muMax3, then open a file with micromagnetic model (a description of the system), remove relaxation and any excitations (CW, pulse etc) and add next lines:
