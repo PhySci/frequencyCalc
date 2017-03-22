@@ -18,22 +18,34 @@ The MatLab class "freqCalc" provides functionality for calculation of local FMR 
  	
 7. Now you have to calculate magnetic fields for the given states using a micromagnetic package. If you use muMax3, then open a file with micromagnetic model (a description of the system), remove relaxation and any excitations (CW, pulse etc) and add next lines:
     
-	// static
+     // static
+     
     m.loadFile("static.stc");  
+    
     saveAs(B_demag,"B_demag_static");
+    
     saveAs(B_exch,"B_exch_static"); 
+    
     saveAs(B_eff,"B_eff_static"); 
  
     // out-of-plane deflection
+    
     m.loadFile("outplane.stc");
+    
     saveAs(B_demag,"B_demag_outplane");
+    
     saveAs(B_exch,"B_exch_outplane");
+    
     saveAs(B_eff,"B_eff_outplane");
 
     // in-plane deflection 
+    
     m.loadFile("inplane.stc");  
+    
     saveAs(B_demag,"B_demag_inplane");
+    
     saveAs(B_exch,"B_exch_inplane");
+    
     saveAs(B_eff,"B_eff_inplane");
 	
 
