@@ -44,17 +44,18 @@ properties
     freq = [];
     
     % external magentic field (Oe)
-    H = 530;
+    H = 2e3;
     
     % damping constant
     alpha = 0.001
     
     % conversion factor for magnetization (A/m -> G)
-    convM = 4*pi/1e3;
+    convM = 1/1e3;
     % conversion factor for magnetic field (T -> G)
-    convH = 1e4;
+    %convH = 1e4; % muMax (T -> G)
+    convH = 4*pi/1e3; % OOMMF (A/m -> G)
     
-    % giromagnetic ratio
+    % gyromagnetic ratio
     gamma = 1.76e7;
 end
 
@@ -136,6 +137,7 @@ methods
     % calculate components of demagnetizing tensor using in-plane and
     % out-of-plane components of magnetizationf and magnetic field
     function calcDemagTensor(obj,varargin)
+        tic()
         
         p = inputParser;
         p.addParamValue('field', 'effective', @(x) any(strcmp({'effective','demag','demag+exchange'},x)));
@@ -170,12 +172,17 @@ methods
             case 'demag'
                 % load demagnetizing fields
                 Hd0   = obj.convH*obj.readFile(obj.BdemagStaticFile);
+                Hd0(:,:,:,2) = Hd0(:,:,:,2) - 2000;
+                
                 HdInp = obj.convH*obj.readFile(obj.BdemagInpFile);
+                HdInp(:,:,:,2) = HdInp(:,:,:,2) - 2000;
+                
                 HdOut = obj.convH*obj.readFile(obj.BdemagOutFile);
+                HdOut(:,:,:,2) = HdOut(:,:,:,2) - 2000;
                 
                 % calculate Nzz
                 obj.Nzz = -(Hd0(:,:,:,1).*obj.M0(:,:,:,1)+Hd0(:,:,:,2).*obj.M0(:,:,:,2)...
-                    +Hd0(:,:,:,3).*obj.M0(:,:,:,3))./(obj.Ms.^2);
+                    +Hd0(:,:,:,3).*obj.M0(:,:,:,3))./(4*pi*obj.Ms.^2);
                 
                 % calculate dynamic fields
                 hInp = reshape(HdInp - Hd0,[L 3]);
@@ -193,9 +200,9 @@ methods
                 HexchOut = obj.convH*obj.readFile(obj.BexchOutFile);
                 
                 % calculate Nzz
-                obj.Nzz = -((Hd0(:,:,:,1)+Hexch0(:,:,:,1)).*M0(:,:,:,1)...
-                    +(Hd0(:,:,:,2)+Hexch0(:,:,:,2)).*M0(:,:,:,2)...
-                    +(Hd0(:,:,:,3)+Hexch0(:,:,:,3)).*M0(:,:,:,3))./(Ms.^2);
+                obj.Nzz = -((Hd0(:,:,:,1)+Hexch0(:,:,:,1)).*obj.M0(:,:,:,1)...
+                    +(Hd0(:,:,:,2)+Hexch0(:,:,:,2)).*obj.M0(:,:,:,2)...
+                    +(Hd0(:,:,:,3)+Hexch0(:,:,:,3)).*obj.M0(:,:,:,3))./(obj.Ms.^2);
                 
                 % calculate dynamic fields
                 hInp = reshape(HdInp - Hd0 + HexchInp - Hexch0,[L 3]);
@@ -214,7 +221,7 @@ methods
             % calculate dynamic magnetization in local system
             mInpLoc(ind,:) = rot*mInp(ind,:).';
             mOutLoc(ind,:) = rot*mOut(ind,:).';
-            M0Loc(ind,:) = rot*M0(ind,:).';
+            M0Loc(ind,:)   = rot*M0(ind,:).';
                         
             % calculate dynamic fields in local coordinate system
             hInpLoc(ind,:)  = rot*hInp(ind,:).';
@@ -231,38 +238,40 @@ methods
                 
         % calculate demagnetizing factors
 
-        obj.Nyy = -hOutLoc(:,:,:,3)./mOutLoc(:,:,:,3);
-        obj.Nyx = -hOutLoc(:,:,:,2)./mOutLoc(:,:,:,3);
+        obj.Nyy = -hOutLoc(:,:,:,3)./(mOutLoc(:,:,:,3)*4*pi);
+        obj.Nyx = -hOutLoc(:,:,:,2)./(mOutLoc(:,:,:,3)*4*pi);
         
-        obj.Nxx = -hInpLoc(:,:,:,2)./mInpLoc(:,:,:,2);
-        obj.Nxy = -hInpLoc(:,:,:,3)./mInpLoc(:,:,:,2);
+        obj.Nxx = -hInpLoc(:,:,:,2)./(mInpLoc(:,:,:,2)*4*pi);
+        obj.Nxy = -hInpLoc(:,:,:,3)./(mInpLoc(:,:,:,2)*4*pi);
 
         obj.calcFreq();
         obj.show();
-                
-        figure(10);
-        imagesc(mInpLoc(:,:,1,2).');
-        title('M inp Loc'); colorbar();
         
-        figure(11);
-        imagesc(hInpLoc(:,:,1,1).');
-        title('H inp Loc X'); colorbar()
-        
-        figure(12);
-        imagesc(hInpLoc(:,:,1,2).');
-        title('H inp Loc Y'); colorbar();
-        
-        figure(13);
-        imagesc(hInpLoc(:,:,1,3).');
-        title('H inp Loc Z'); colorbar();
+        if false
 
-        
+            figure(10);
+            imagesc(mInpLoc(:,:,1,2).');
+            title('M inp Loc'); colorbar();
+
+            figure(11);
+            imagesc(hInpLoc(:,:,1,1).');
+            title('H inp Loc X'); colorbar()
+
+            figure(12);
+            imagesc(hInpLoc(:,:,1,2).');
+            title('H inp Loc Y'); colorbar();
+
+            figure(13);
+            imagesc(hInpLoc(:,:,1,3).');
+            title('H inp Loc Z'); colorbar();
+        end  
+        toc()
     end
     
     % calculate frequency of quasi-uniform mode using demagnetizing tensor 
     function calcFreq(obj)
-        obj.freq = obj.gamma*sqrt(abs((obj.H+obj.Ms.*(obj.Nxx-obj.Nzz)).*...
-            (obj.H+obj.Ms.*(obj.Nyy-obj.Nzz))))/(2*pi);
+        obj.freq = obj.gamma*sqrt(abs((obj.H+4*pi*obj.Ms.*(obj.Nxx-obj.Nzz)).*...
+            (obj.H+4*pi*obj.Ms.*(obj.Nyy-obj.Nzz))))/(2*pi);
         
     end    
     
@@ -303,20 +312,23 @@ methods
             title('Nzz'); colorbar();
 
         f4 = figure(4);
-            clf(); set(gcf,'name','Frequency','numbertitle','off');
+            clf(); set(gcf,'name','Frequency (GHz)','numbertitle','off');
             imagesc(xScale,yScale,squeeze(obj.freq(:,:,params.zSlice)).'/1e9);
             title('Frequency'); colorbar();
         
         yScale = linspace(0,5,obj.ynodes);
-        f5 = figure(5);
-        clf();
-        set(gcf,'name','Frequency slice','numbertitle','off'); 
-        plot(yScale,squeeze(obj.freq(1000,:,1))/1e9); title('Frequency');
-        ylabel('Frequency (GHz)');
-        xlabel('x (\mum)');
+        
+        if false
+            f5 = figure(5);
+                clf();
+                set(gcf,'name','Frequency slice','numbertitle','off'); 
+                plot(yScale,squeeze(obj.freq(1000,:,1))/1e9); title('Frequency');
+                ylabel('Frequency (GHz)');
+                xlabel('x (\mum)');
+        end     
         
         % save images
-        if true
+        if false
             print(f1,'-dpng','Nxx.png');
             print(f2,'-dpng','Nyy.png');
             print(f3,'-dpng','Nzz.png');
@@ -611,6 +623,15 @@ methods
            xlabel('Frequency (GHz)');
        
     end
+    
+    function res = getXScale(obj)
+        res = linspace(obj.xmin,obj.xmax,obj.xnodes); 
+    end
+    
+    function res = getYScale(obj)
+        res = linspace(obj.ymin,obj.ymax,obj.ynodes); 
+    end    
+
     
 end
 
