@@ -161,9 +161,23 @@ methods
                 HeffInp = obj.convH*obj.readFile(obj.BexchStaticFile);
                 HeffOut = obj.convH*obj.readFile(obj.BeffFile);
                 
+                % subtract bias field
+                Heff0(:,:,:,1) = Heff0(:,:,:,1) - obj.H(1);
+                Heff0(:,:,:,2) = Heff0(:,:,:,2) - obj.H(2);
+                Heff0(:,:,:,3) = Heff0(:,:,:,3) - obj.H(3);
+                
+                HeffInp(:,:,:,1) = HeffInp(:,:,:,1) - obj.H(1);
+                HeffInp(:,:,:,2) = HeffInp(:,:,:,2) - obj.H(2);
+                HeffInp(:,:,:,3) = HeffInp(:,:,:,3) - obj.H(3);
+                
+                HeffOut(:,:,:,1) = HeffOut(:,:,:,1) - obj.H(1);
+                HeffOut(:,:,:,2) = HeffOut(:,:,:,2) - obj.H(2);
+                HeffOut(:,:,:,3) = HeffOut(:,:,:,3) - obj.H(3);
+                             
+                
                 % calculate Nzz
-                obj.Nzz = -(Heff0(:,:,:,1).*M0(:,:,:,1)+Heff0(:,:,:,2).*M0(:,:,:,2)...
-                    +Heff0(:,:,:,3).*M0(:,:,:,3))./(Ms.^2);
+                obj.Nzz = -(Heff0(:,:,:,1).*obj.M0(:,:,:,1)+Heff0(:,:,:,2).*obj.M0(:,:,:,2)...
+                    +Heff0(:,:,:,3).*obj.M0(:,:,:,3))./(4*pi*obj.Ms.^2);
                 
                 % calculate dynamic fields
                 hInp = reshape(HeffInp - Heff0,[L 3]);
@@ -172,13 +186,8 @@ methods
             case 'demag'
                 % load demagnetizing fields
                 Hd0   = obj.convH*obj.readFile(obj.BdemagStaticFile);
-                Hd0(:,:,:,2) = Hd0(:,:,:,2) - 2000;
-                
-                HdInp = obj.convH*obj.readFile(obj.BdemagInpFile);
-                HdInp(:,:,:,2) = HdInp(:,:,:,2) - 2000;
-                
+                HdInp = obj.convH*obj.readFile(obj.BdemagInpFile);  
                 HdOut = obj.convH*obj.readFile(obj.BdemagOutFile);
-                HdOut(:,:,:,2) = HdOut(:,:,:,2) - 2000;
                 
                 % calculate Nzz
                 obj.Nzz = -(Hd0(:,:,:,1).*obj.M0(:,:,:,1)+Hd0(:,:,:,2).*obj.M0(:,:,:,2)...
@@ -202,7 +211,7 @@ methods
                 % calculate Nzz
                 obj.Nzz = -((Hd0(:,:,:,1)+Hexch0(:,:,:,1)).*obj.M0(:,:,:,1)...
                     +(Hd0(:,:,:,2)+Hexch0(:,:,:,2)).*obj.M0(:,:,:,2)...
-                    +(Hd0(:,:,:,3)+Hexch0(:,:,:,3)).*obj.M0(:,:,:,3))./(obj.Ms.^2);
+                    +(Hd0(:,:,:,3)+Hexch0(:,:,:,3)).*obj.M0(:,:,:,3))./(4*pi*obj.Ms.^2);
                 
                 % calculate dynamic fields
                 hInp = reshape(HdInp - Hd0 + HexchInp - Hexch0,[L 3]);
