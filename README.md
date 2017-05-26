@@ -1,6 +1,5 @@
 The MatLab class "freqCalc" provides functionality for calculation of local FMR frequencies, using a semi-analitical approach described by C. S. Davies, V. D. Poimanov, and V. V. Kruglyak (publication in progress).
 
-![alt tag](img/fMap.png)
 
 ## How to use it?
 
@@ -71,3 +70,5 @@ There are a few options which fields will be taken into account:
 
 Output of the script is a few images (diagonal componens of the demagnetization tensor, map of frequency, local fields). But you can read all these values as properies of the class instance (for example, FC.Nxx is three dimensional array of Nxx demagnetization component, FC.freq is three-dimensional array of FMR frequency and so on). 
 	
+![alt tag](img/fMap.png)
+![alt tag](img/fSlice.png)
