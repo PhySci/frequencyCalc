@@ -70,7 +70,7 @@ properties (Access = private)
     % effective field files
     BeffFile = 'B_eff_static.ovf'; 
     BeffOutFile = 'B_eff_outplane.ovf'; 
-    BeffInpFile = 'B_eff_inpplane.ovf'; 
+    BeffInpFile = 'B_eff_inplane.ovf'; 
 
     % demagnetizing field files
     BdemagInpFile = 'B_demag_inplane.ovf';
@@ -157,9 +157,9 @@ methods
         switch (params.field)
             case 'effective'
                 % load effective fields
-                Heff0 = obj.convH*obj.readFile(obj.BdemagStaticFile);
-                HeffInp = obj.convH*obj.readFile(obj.BexchStaticFile);
-                HeffOut = obj.convH*obj.readFile(obj.BeffFile);
+                Heff0 = obj.convH*obj.readFile(obj.BeffFile);
+                HeffInp = obj.convH*obj.readFile(obj.BeffInpFile);
+                HeffOut = obj.convH*obj.readFile(obj.BeffOutFile);
                 
                 % subtract bias field
                 Heff0(:,:,:,1) = Heff0(:,:,:,1) - obj.H(1);
@@ -279,8 +279,16 @@ methods
     
     % calculate frequency of quasi-uniform mode using demagnetizing tensor 
     function calcFreq(obj)
-        obj.freq = obj.gamma*sqrt(abs((obj.H+4*pi*obj.Ms.*(obj.Nxx-obj.Nzz)).*...
-            (obj.H+4*pi*obj.Ms.*(obj.Nyy-obj.Nzz))))/(2*pi);
+        
+        % calculate absolute value of field
+        H = 0;
+        for ind = 1:length(obj.H)
+            H = H + obj.H(ind)^2; 
+        end
+        H = sqrt(H);
+        
+        obj.freq = obj.gamma*sqrt(abs((H+4*pi*obj.Ms.*(obj.Nxx-obj.Nzz)).*...
+            (H+4*pi*obj.Ms.*(obj.Nyy-obj.Nzz))))/(2*pi);
         
     end    
     
