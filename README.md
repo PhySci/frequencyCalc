@@ -1,4 +1,4 @@
-The MatLab class "freqCalc" provides functionality for calculation of local FMR frequencies, using a semi-analitical approach described by C. S. Davies, V. D. Poimanov, and V. V. Kruglyak (publication in progress).
+The MatLab class "freqCalc" provides functionality for calculation of local FMR frequencies, using a semi-analitical approach described by C. S. Davies, V. D. Poimanov, and V. V. Kruglyak (https://arxiv.org/abs/1706.03212).
 
 
 ## How to use it?
