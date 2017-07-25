@@ -44,7 +44,7 @@ properties
     freq = [];
     
     % external magentic field (Oe)
-    H = 2e3;
+    H = [0, 5e3, 0];
     
     % damping constant
     alpha = 0.001
@@ -52,8 +52,8 @@ properties
     % conversion factor for magnetization (A/m -> G)
     convM = 1/1e3;
     % conversion factor for magnetic field (T -> G)
-    %convH = 1e4; % muMax (T -> G)
-    convH = 4*pi/1e3; % OOMMF (A/m -> G)
+    convH = 1e4; % muMax (T -> G)
+    %convH = 4*pi/1e3; % OOMMF (A/m -> G)
     
     % gyromagnetic ratio
     gamma = 1.76e7;
@@ -104,7 +104,7 @@ methods
     % calculate in-plane and out-of-plane deflections of magnetisation,
     % save deflected states
     function calcDeflection(obj)
-        obj.readFile(obj.staticFile);
+        %obj.readFile(obj.staticFile);
         disp('Calculate fields');
         obj.M0 = obj.readFile(obj.staticFile);
         obj.Ms = sqrt(obj.M0(:,:,:,1).^2+obj.M0(:,:,:,2).^2+obj.M0(:,:,:,3).^2);
@@ -256,11 +256,19 @@ methods
         obj.calcFreq();
         obj.show();
         
-        if false
-
+        if true
+            
+            figure(14);
+            imagesc(mInpLoc(:,:,1,1).');
+            title('M inp Loc X'); colorbar();
+            
+            figure(15);
+            imagesc(mInpLoc(:,:,1,3).');
+            title('M inp Loc Z'); colorbar();
+            
             figure(10);
             imagesc(mInpLoc(:,:,1,2).');
-            title('M inp Loc'); colorbar();
+            title('M inp Loc Y'); colorbar();
 
             figure(11);
             imagesc(hInpLoc(:,:,1,1).');
@@ -289,6 +297,8 @@ methods
         
         obj.freq = obj.gamma*sqrt(abs((H+4*pi*obj.Ms.*(obj.Nxx-obj.Nzz)).*...
             (H+4*pi*obj.Ms.*(obj.Nyy-obj.Nzz))))/(2*pi);
+     
+        obj.freq(find(imag(obj.freq))) = -abs(obj.freq(find(imag(obj.freq))));
         
     end    
     
@@ -317,21 +327,25 @@ methods
             clf(); set(gcf,'name','Nxx','numbertitle','off') 
             imagesc(xScale,yScale,squeeze(obj.Nxx(:,:,params.zSlice)).');
             title('Nxx'); colorbar();
+            axis xy equal
 
         f2 = figure(2);
             clf(); set(gcf,'name','Nyy','numbertitle','off') 
             imagesc(xScale,yScale,squeeze(obj.Nyy(:,:,params.zSlice)).');
             title('Nyy'); colorbar();
+            axis xy equal
 
         f3 = figure(3);
             clf(); set(gcf,'name','Nzz','numbertitle','off') 
             imagesc(xScale,yScale,squeeze(obj.Nzz(:,:,params.zSlice)).');
             title('Nzz'); colorbar();
+            axis xy equal
 
         f4 = figure(4);
             clf(); set(gcf,'name','Frequency (GHz)','numbertitle','off');
             imagesc(xScale,yScale,squeeze(obj.freq(:,:,params.zSlice)).'/1e9);
             title('Frequency'); colorbar();
+            axis xy equal
         
         yScale = linspace(0,5,obj.ynodes);
         
